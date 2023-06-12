@@ -119,7 +119,7 @@ else;
 last_dt=weather_dt;
 run;
 
-title hourly or better weather coverage; 
+title hourly or more frequent weather data coverage; 
 proc sql;
 select
 month format=yymmn6.,
@@ -362,12 +362,15 @@ else speed_label='10-50';
 
 run;
 
+proc freq data=windrose(rename=(compass_label=direction speed_label=speed));
+tables direction*speed / out=wr1 norow nocol nocum;
+run;
+
 title wind direction and speed since &end;
-proc gradar data=windrose(rename=(compass_label=direction speed_label=speed));
-    chart direction /
+proc gradar data=wr1;
+    chart direction / sumvar=percent
     windrose
     speed=speed
     noframe;
-
-run;
-
+run;    
+quit;
