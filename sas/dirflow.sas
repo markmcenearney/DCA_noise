@@ -1,6 +1,3 @@
-*tbd: exclude intervals where weather data is more than 1 hour old;
-*tbd: consider adjusting resulting counts per opsnet counts;
-
 *analyze dir flow and weather;
 *source of weather data is https://mesonet.agron.iastate.edu/request/download.phtml?network=VA_ASOS;
 
