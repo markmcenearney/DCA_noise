@@ -366,7 +366,7 @@ proc freq data=windrose(rename=(compass_label=direction speed_label=speed));
 tables direction*speed / out=wr1 norow nocol nocum;
 run;
 
-title wind direction and speed since &end;
+title wind direction and speed since &start;
 proc gradar data=wr1;
     chart direction / sumvar=percent
     windrose
