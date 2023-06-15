@@ -101,37 +101,6 @@ run;
 
 proc sort data=asos; by weather_dt; run;
 
-data coverage; *hourly weather coverage;
-retain last_dt .;
-set asos;
-by weather_dt;
-
-if last_dt ^=. then
-  do;
-    if weather_dt-last_dt <= 3600 then
-      do;
-        coverage_in_hours=(weather_dt-last_dt)/3600; /* convert seconds to hours */
-        output;
-      end;
-    else;
-  end;
-else;
-last_dt=weather_dt;
-run;
-
-title hourly or more frequent weather data coverage; 
-proc sql;
-select
-month format=yymmn6.,
-sum(coverage_in_hours)/day(intnx('month', month, 0, 'end'))/24*100 as weather_coverage
-from
-coverage
-group by 
-month
-;
-quit;
-
-
 data asos2(keep=weather_dt year wind_dir wind_speed sky1 sky1_level measurement_duration);
 
 retain
@@ -362,6 +331,7 @@ else speed_label='10-50';
 
 run;
 
+title wind direction and speed since &start;
 proc freq data=windrose(rename=(compass_label=direction speed_label=speed));
 tables direction*speed / out=wr1 norow nocol nocum;
 run;
@@ -373,4 +343,35 @@ proc gradar data=wr1;
     speed=speed
     noframe;
 run;    
+quit;
+
+
+data coverage; *hourly weather coverage;
+retain last_dt .;
+set asos;
+by weather_dt;
+
+if last_dt ^=. then
+  do;
+    if weather_dt-last_dt <= 3600 then
+      do;
+        coverage_in_hours=(weather_dt-last_dt)/3600; /* convert seconds to hours */
+        output;
+      end;
+    else;
+  end;
+else;
+last_dt=weather_dt;
+run;
+
+title hourly or more frequent weather data coverage (percent); 
+proc sql;
+select
+month format=yymmn6.,
+sum(coverage_in_hours)/day(intnx('month', month, 0, 'end'))/24*100 as weather_coverage
+from
+coverage
+group by 
+month
+;
 quit;
