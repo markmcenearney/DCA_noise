@@ -1,5 +1,6 @@
 *analyze dir flow and weather;
-*source of weather data is https://mesonet.agron.iastate.edu/request/download.phtml?network=VA_ASOS;
+*source of weather data is https://mesonet.agron.iastate.edu/request/download.phtml?network=VA_ASOS
+*periodicity is hourly + specials thru 2016-04-30 12:55 then every 5 minutes therafter  
 
 %let start=1Mar15;
 %let end=30Apr23;
