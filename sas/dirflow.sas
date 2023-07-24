@@ -8,7 +8,7 @@
 
 libname noise "/home/&user.0/noise";
 libname weather "/home/&user.0/weather";
-filename weather "/home/&user.0/weather/DCA.csv" termstr=lf;
+filename weather "/home/&user.0/weather/asos.txt" termstr=lf;
 
 data w1 (keep=weather_dt weather_date year month hour wind_dir wind_speed sky1 sky1_level);
 
