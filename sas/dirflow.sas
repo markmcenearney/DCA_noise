@@ -1,72 +1,54 @@
 *analyze dir flow and weather;
-*source of weather data is https://mesonet.agron.iastate.edu/request/download.phtml?network=VA_ASOS
-*periodicity is hourly + specials thru 2016-04-30 12:55 then every 5 minutes therafter  
+*source of weather data is https://mesonet.agron.iastate.edu/request/download.phtml?network=VA_ASOS;
+*weather obs are hourly + specials thru April 2016 and every 5 minutes thereafter;
 
 %let start=1Mar15;
-%let end=30Apr23;
-%let end_minus12months=1May22;
+%let end=30Jun23;
 %let user=markmcenearney;
 
 libname noise "/home/&user.0/noise";
-filename asos "/home/&user.0/noise/asos.txt" termstr=lf;
+libname weather "/home/&user.0/weather";
+filename weather "/home/&user.0/weather/DCA.csv" termstr=lf;
 
-data asos_input;
+data w1 (keep=weather_dt weather_date year month hour wind_dir wind_speed sky1 sky1_level);
 
 %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
-infile ASOS delimiter = ',' MISSOVER DSD firstobs=2 ;
-*station,valid,tmpf,dwpf,relh,drct,sknt,vsby,gust,skyc1,skyl1,peak_wind_gust,peak_wind_drct,peak_wind_time ;
+infile weather delimiter = ',' MISSOVER DSD firstobs=2 ;
+* station,datetime,tmpf,relh,drct,sknt,gust,skyc1,skyl1;
+
 informat station $3. ;
 informat _datetime $20. ;
-informat tmpf $5. ;
-informat _dwpf $5. ;
-informat _relh $7. ;
+informat _tmpf $6. ;
+informat _relh $6. ;
 informat _drct $7. ;
 informat _sknt $7. ;
-informat _vsby $7. ;
-informat _gust $5. ;
+informat _gust $5.;
 informat _skyc1 $3. ;
 informat _skyl1 $7. ;
-informat _peak_wind_gust $5. ;
-informat _peak_wind_drct $6. ;
-informat _peak_wind_time $20. ;
  
 format station $3. ;
 format _datetime $40. ;
-format tmpf $5. ;
-format _dwpf $5. ;
-format _relh $7. ;
+format _tmpf $6. ;
+format _relh $6. ;
 format _drct $7. ;
 format _sknt $7. ;
-format _vsby $7. ;
-format _gust $5. ;
+format _gust $5.;
 format _skyc1 $3. ;
-format _peak_wind_gust $5. ;
-format _peak_wind_drct $6. ;
-format _peak_wind_time $20. ;
- 
+format _skyl1 $7. ;
 input
 station $
 _datetime $
-tmpf $
-_dwpf $
+_tmpf $
 _relh $
 _drct $
 _sknt $
-_vsby $
 _gust $
 _skyc1 $
 _skyl1 $
-_peak_wind_gust $
-_peak_wind_drct $
-_peak_wind_time $
 
 ;
 
 if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
-run;
- 
-data asos (keep=weather_dt weather_date year month hour tmpf wind_dir wind_speed sky1 sky1_level peak_wind_gust);
-set asos_input;
 
 weather_dt=dhms(input(substr(_datetime,1,10),yymmdd10.), 0,0,input(substr(_datetime,12,5),time5.));
 weather_date=datepart(weather_dt);
@@ -91,18 +73,26 @@ if _skyl1='M' then
   sky1_level=.;
 else sky1_level=input(_skyl1,7.);
 
-if _peak_wind_gust='M' then
-  peak_wind_gust=.;
-else peak_wind_gust=input(_peak_wind_gust,7.);
-
-output asos;
+output;
 
 format month yymmn6. weather_date yymmdd8.;
 run;
 
-proc sort data=asos; by weather_dt; run;
+/* tbd check duplicates before deleting to see if data are the same */
+proc sort nodupkey data=w1; by weather_dt; run;
+  
+proc freq data=w1;
+tables month;
+title DCA weather obs per month;
+run;
 
-data asos2(keep=weather_dt year wind_dir wind_speed sky1 sky1_level measurement_duration);
+/*
+proc freq data=w1(where=(weather_date between '16Apr16'd and '31May16'd));
+tables weather_date;
+run;
+*/
+
+data w2(keep=weather_dt year wind_dir wind_speed sky1 sky1_level measurement_duration);
 
 retain
 weather_dt .
@@ -112,13 +102,13 @@ sky1 'xxx'
 sky1_level .
 ;
 
-set asos(rename=(weather_dt=_weather_dt wind_dir=_wind_dir wind_speed=_wind_speed sky1=_sky1 sky1_level=_sky1_level));
+set w1(rename=(weather_dt=_weather_dt wind_dir=_wind_dir wind_speed=_wind_speed sky1=_sky1 sky1_level=_sky1_level));
 by _weather_dt;
 
 if _n_>1 then
   do;
-    measurement_duration=max(1,(_weather_dt-weather_dt)/3600); /* convert seconds to hours */
-    if measurement_duration<=1.5 then output; *exclude weather obs more than 90 minutes old;
+    measurement_duration=(_weather_dt-weather_dt)/60; /* convert seconds to minutes */
+    *if measurement_duration<=60 then output; *exclude weather obs more than 60 minutes old;
   end;
 else;
 
@@ -129,15 +119,18 @@ sky1=_sky1;
 sky1_level=_sky1_level;
 run;
 
+title distribution of elapsed time between weather obs in minutes;
+proc freq data=w2; tables measurement_duration; run;
+
 title wind direction since &start;
-proc freq data=asos2;
+proc freq data=w2(where=(measurement_duration<=60));
 tables wind_dir;
 weight measurement_duration;
 run;
 
-data noise.weather_class;
+data weather.weather_class;
 length weather_class $ 25 wind_dir_class $ 1;
-set asos2;
+set w2(where=(measurement_duration<=60));
 * file "/home/markmcenearney0/noise/wind_rose_data.txt";
 
 if wind_dir >= (-4 +360 - 45) or wind_dir<=(-4 + 45) then
@@ -183,45 +176,31 @@ output;
 
 run;
 
-/*
-proc sql;
-select count(*)
-from 
-noise.weather_class
-where
-weather_class = '';
-
-select * 
-from 
-noise.weather_class
-where
-weather_class = '';
-quit;
-*/
-
-
 title wind conditions since &start;
-proc freq data=noise.weather_class(where=(weather_class = ''));
+title2 weighted by measurement_duration;
+proc freq data=weather.weather_class(where=(weather_class = ''));
 tables wind_dir_class;
+weight measurement_duration;
 run;
 
 title wind and cloud ceiling conditions since &start;
-proc freq data=noise.weather_class;
+title2 weighted by measurement_duration;
+proc freq data=weather.weather_class;
 tables weather_class / out=f1 nocol nocum norow;
 weight measurement_duration;
 run;
 
-data w1;
-set noise.weather_class;
+data w3;
+set weather.weather_class;
 format weather_dt datetime19.;
 run;
 
-proc sort data=w1; by weather_dt; run;
+proc sort data=w3; by weather_dt; run;
 
 *generate per minute weather obs for merging with operations data;
 
-data w2;
-set w1;
+data w4;
+set w3;
 by weather_dt;
 
 lag_weather_dt=lag(weather_dt);
@@ -238,11 +217,10 @@ else;
 drop end;
 run;
 
-data n1;
+data f1;
 set noise.nmt_events (where=(nmtid in (7,8) and datepart(start_date_time) between "&start"d and "&end"d));
-noise_dt=start_date_time;
-weather_dt = round(noise_dt,hms(0,1,00)); * round to nearest minute;
-month=intnx('MONTH', datepart(max_level_date_time), 0, 'BEGINNING');
+weather_dt = round(start_date_time,hms(0,1,00)); * round to nearest minute;
+month=intnx('MONTH', datepart(start_date_time), 0, 'BEGINNING');
 
 if nmtid=7 then
   if operation_type='D' then
@@ -252,30 +230,35 @@ else if operation_type='D' then
   dir_flow='S';
 else dir_flow='N';
 
-format noise_dt weather_dt datetime19.;
+format start_date_time weather_dt datetime19.;
 run;
 
-proc sort data=n1; by weather_dt; run;
+proc sort data=f1; by weather_dt; run;
 
-data nw1 nomatch;
-merge w2(in=in_w2) n1(in=in_n1);
+data fw1 nomatch;
+merge w4(in=in_w4) f1(in=in_f1);
 by weather_dt;
-if in_n1 then
+if in_f1 then
   if in_w2 then
-    output nw1;
+    output fw1;
   else output nomatch;
 else;
 run;
 
-proc freq data=nw1;
+proc sort data=fw1; by year; run;
+
+proc freq data=fw1;
 tables dir_flow*weather_class / nocol norow nocum nopercent;
 title north and south flow ops per weather class since &start;
+by year;
 run;
 
-proc freq data=nw1(where=(datepart(weather_dt) between "&end_minus12months"d and "&end"d));
+/*
+proc freq data=fw1(where=(datepart(weather_dt) between "&end_minus12months"d and "&end"d));
 tables dir_flow*weather_class / out=f1 nocol norow nocum nopercent;
 title north and south flow ops per weather class in 12 months ending &end;
 run;
+*/
 
 /*
 title percent north in months &start to &end;
@@ -309,7 +292,7 @@ where datepart(weather_dt) between &end_minus12months and &end;
 */
 
 data windrose;
-set noise.weather_class;
+set weather.weather_class;
 length compass_label $3. speed_label $12.;
 select;
   when (wind_dir >= 337.5 or wind_dir < 22.5) compass_label = 'N';
@@ -333,11 +316,14 @@ else speed_label='10-50';
 run;
 
 title wind direction and speed since &start;
+title2 weighted by measurement_duration;
 proc freq data=windrose(rename=(compass_label=direction speed_label=speed));
 tables direction*speed / out=wr1 norow nocol nocum;
+weight measurement_duration;
 run;
 
 title wind direction and speed since &start;
+title2;
 proc gradar data=wr1;
     chart direction / sumvar=percent
     windrose
@@ -346,10 +332,9 @@ proc gradar data=wr1;
 run;    
 quit;
 
-
 data coverage; *hourly weather coverage;
 retain last_dt .;
-set asos;
+set w4;
 by weather_dt;
 
 if last_dt ^=. then
@@ -365,6 +350,7 @@ else;
 last_dt=weather_dt;
 run;
 
+/*
 title hourly or more frequent weather data coverage (percent); 
 proc sql;
 select
@@ -376,3 +362,4 @@ group by
 month
 ;
 quit;
+*/
