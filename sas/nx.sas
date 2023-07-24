@@ -71,6 +71,12 @@ format month yymmn6.;
 title aircraft noise events above &x dBA;
 run;
 
+proc freq data=n1(where=(max_level>&x and timepart(start_date_time) not between '07:00't and '22:00't));
+table month*nmtid / norow nocol nocum nopercent;
+format month yymmn6.;
+title nighttime aircraft noise events above &x dBA;
+run;
+
 /*
 proc sgplot data=f3(rename=(count=nx));
 styleattrs datacontrastcolors=(red green blue);
