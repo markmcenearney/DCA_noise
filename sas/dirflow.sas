@@ -84,6 +84,7 @@ proc sort nodupkey data=w1; by weather_dt; run;
 proc freq data=w1;
 tables month;
 title DCA weather obs per month;
+title2 note increase in 201605 when weather data became available every 5 minutes;
 run;
 
 /*
@@ -123,6 +124,7 @@ title distribution of elapsed time between weather obs in minutes;
 proc freq data=w2; tables measurement_duration; run;
 
 title wind direction since &start;
+title2 weighted by measurement_duration except where duration > 60 minutes;
 proc freq data=w2(where=(measurement_duration<=60));
 tables wind_dir;
 weight measurement_duration;
@@ -176,15 +178,15 @@ output;
 
 run;
 
-title wind conditions since &start;
-title2 weighted by measurement_duration;
+title wind direction since &start;
+title2 weighted by measurement_duration except where duration > 60 minutes;
 proc freq data=weather.weather_class(where=(weather_class = ''));
 tables wind_dir_class;
 weight measurement_duration;
 run;
 
 title wind and cloud ceiling conditions since &start;
-title2 weighted by measurement_duration;
+title2 weighted by measurement_duration except where duration > 60 minutes;
 proc freq data=weather.weather_class;
 tables weather_class / out=f1 nocol nocum norow;
 weight measurement_duration;
@@ -239,7 +241,7 @@ data fw1 nomatch;
 merge w4(in=in_w4) f1(in=in_f1);
 by weather_dt;
 if in_f1 then
-  if in_w2 then
+  if in_w4 then
     output fw1;
   else output nomatch;
 else;
@@ -316,7 +318,7 @@ else speed_label='10-50';
 run;
 
 title wind direction and speed since &start;
-title2 weighted by measurement_duration;
+title2 weighted by measurement_duration except where duration > 60 minutes;
 proc freq data=windrose(rename=(compass_label=direction speed_label=speed));
 tables direction*speed / out=wr1 norow nocol nocum;
 weight measurement_duration;
