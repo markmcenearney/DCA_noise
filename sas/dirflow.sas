@@ -252,6 +252,11 @@ proc sort data=fw1; by year; run;
 proc freq data=fw1;
 tables dir_flow*weather_class / nocol norow nocum nopercent;
 title north and south flow ops per weather class since &start;
+run;
+
+proc freq data=fw1;
+tables dir_flow*weather_class / nocol norow nocum nopercent;
+title north and south flow ops per weather class;
 by year;
 run;
 
